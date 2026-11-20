@@ -89,3 +89,20 @@ test('Pending holds the commanded state until telemetry agrees or the hold ends'
   now = 2000;
   assert.equal(p.target(1), 1);    // hold expired: telemetry wins
 });
+
+test('refusal bytes get the meaning from the CarLinko app', async () => {
+  const { controlError, refusalText } = await import('../src/state.js');
+  assert.equal(refusalText('21'), 'a door is open');
+  assert.equal(refusalText('9f'), 'the car is unlocked; lock it first');
+  assert.equal(refusalText('ZZ'), null);
+  // OpenLinko's generic text is replaced...
+  assert.equal(controlError({ ok: false, result: '21', reason: 'Car refused (code 0x21)' }), 'Car refused: a door is open (0x21)');
+  // ...and so is its short A/C text, which gains what to do...
+  assert.equal(controlError({ ok: false, result: '22', reason: 'A door is unlocked' }), 'Car refused: a door is unlocked; lock the car first (0x22)');
+  // ...while permission errors keep OpenLinko's wording
+  assert.equal(controlError({ ok: false, result: '44', reason: "No operation permission: this CarLinko account isn't authorised on the car's T-Box" }),
+    "No operation permission: this CarLinko account isn't authorised on the car's T-Box");
+  // ...and frame rejections (bare 74RR) stay OpenLinko's
+  assert.equal(controlError({ ok: false, result: '04', reason: 'Car control system error (0x04)' }), 'Car control system error (0x04)');
+  assert.equal(controlError({ ok: false, error: 'boom' }), 'boom');
+});

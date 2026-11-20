@@ -23,6 +23,12 @@ const STREAM_IDLE_MS = 60_000;        // OpenLinko pings every 15 s; 60 s of sil
 const BACKOFF_MS = [3_000, 6_000, 15_000, 30_000, 60_000];
 const CONTROL_GAP_MS = 3_000;         // minimum time between two commands to the car
 
+interface Slot {
+  op: string;
+  started: boolean;
+  promise: Promise<ControlResult>;
+}
+
 /**
  * Events:
  *  - 'summary' (Summary): every stream push, and every fallback poll
@@ -35,6 +41,7 @@ export class OpenLinkoClient extends EventEmitter {
   private abort: AbortController | null = null;
   private queue: Promise<unknown> = Promise.resolve();
   private lastControl = 0;
+  private readonly slots = new Map<string, Slot>();
   connected = false;
 
   constructor(url: string, private readonly password: string | undefined, private readonly log: Log) {
@@ -109,27 +116,53 @@ export class OpenLinkoClient extends EventEmitter {
   /**
    * Send one remote command through OpenLinko. Commands are serialised (the car handles one at a
    * time anyway) and spaced CONTROL_GAP_MS apart. Only opcodes from the plugin's allow-list go out.
+   *
+   * `slot` names the tile asking (e.g. "liftgate"). Within a slot:
+   *  - the same command already queued or on its way is not sent again (Home re-sends targets);
+   *  - a command that hasn't gone out yet is replaced by a newer one (open then close: only close
+   *    is sent; a dragged temperature slider: only the last value).
    */
-  control(op: string): Promise<ControlResult> {
+  control(op: string, slot?: string): Promise<ControlResult> {
     if (!isAllowedOp(op)) {
       return Promise.reject(new Error(`opcode ${op} is not allowed by this plugin`));
     }
+    if (slot) {
+      const s = this.slots.get(slot);
+      if (s && s.op === op) {
+        return s.promise;
+      }
+      if (s && !s.started) {
+        s.op = op;
+        return s.promise;
+      }
+    }
+    const entry: Slot = { op, started: false, promise: Promise.resolve({}) };
     const run = async (): Promise<ControlResult> => {
       const wait = this.lastControl + CONTROL_GAP_MS - Date.now();
       if (wait > 0) {
         await new Promise((r) => setTimeout(r, wait));
       }
+      entry.started = true;
       this.lastControl = Date.now();
       // OpenLinko waits up to 20 s for the car, plus CarLinko's own latency.
       const res = await this.request('/api/control', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: op }),
+        body: JSON.stringify({ data: entry.op }),
       }, 45_000);
       return (await res.json()) as ControlResult;
     };
     const p = this.queue.then(run, run);
     this.queue = p.catch(() => undefined);
+    entry.promise = p;
+    if (slot) {
+      this.slots.set(slot, entry);
+      p.finally(() => {
+        if (this.slots.get(slot) === entry) {
+          this.slots.delete(slot);
+        }
+      }).catch(() => undefined);
+    }
     return p;
   }
 

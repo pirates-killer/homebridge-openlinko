@@ -124,10 +124,14 @@ network to Wi-Fi clients on a satellite. You only need this while pairing.
 
 - **Live updates:** the plugin follows OpenLinko's `/api/stream`, so a tile changes as soon as the car
   reports. If the stream drops, it reconnects and polls `/api/summary` every 60 s in the meantime.
-- **Commands** go through OpenLinko's `/api/control`, one at a time and at least 3 s apart.
+- **Commands** go through OpenLinko's `/api/control`, one at a time and at least 3 s apart. A command
+  that's already queued or on its way isn't sent twice (Home re-sends targets), and if you change
+  your mind before a queued command goes out (open, then close), only the latest is sent.
   Home shows *"Locking…"* until the car confirms or its next status report agrees. If the car
-  refuses, the tile goes back and the reason is logged, using OpenLinko's own wording:
-  *"A door is unlocked"*, *"Vehicle in motion"*, *"No operation permission"*…
+  refuses, the tile goes back and the reason is logged in plain words, with the meanings the
+  CarLinko app itself uses: *"Car refused: a door is open (0x21)"*, *"a door is unlocked; lock the car
+  first (0x22)"*, *"the car is moving (0x2A)"*. Permission errors keep OpenLinko's wording (*"No
+  operation permission"*).
 - A **sleeping car** may accept a command without confirming it. The tile keeps the new state for up to 2 minutes
   while the car wakes up and reports, then follows the car.
 - **A/C:** the car reports no cabin temperature, so "current temperature" shows the set-point.

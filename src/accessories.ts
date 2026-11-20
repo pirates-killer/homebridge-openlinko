@@ -53,9 +53,10 @@ export abstract class CarAccessory {
    * Fire a command without blocking HomeKit (the car can take 20 s; Home shows "No Response"
    * after ~10 s). onDone gets the verdict; failures are logged with OpenLinko's own reason.
    */
-  protected send(op: string, what: string, onDone: (ok: boolean, confirmed: boolean) => void): void {
+  protected send(op: string, what: string, onDone: (ok: boolean, confirmed: boolean) => void,
+    slot = String(this.accessory.context.kind)): void {
     this.platform.log.info(`${this.label}: ${what}`);
-    this.platform.client.control(op).then(
+    this.platform.client.control(op, slot).then(
       (r: ControlResult) => {
         if (r.ok) {
           this.platform.log.info(`${this.label}: ${what} — ${r.confirmed ? 'done' : 'sent (the car did not confirm yet)'}`);
@@ -246,7 +247,7 @@ export class ClimateAccessory extends CarAccessory {
           this.wanted.clear();
         }
         this.update(this.platform.summary);
-      });
+      }, 'climate-temp');                       // own slot: never replaces a queued A/C on/off
     }, 2_000);
   }
 

@@ -18,3 +18,6 @@ First release.
   current position). Map tiles follow the OSMF Tile Usage Policy: loaded by the browser with the
   page's origin as Referer, only what's on screen, the OpenStreetMap credit always on the map
 - Engine start deliberately not exposed (command allow-list)
+- Refusals explained in plain words (result-byte meanings from the CarLinko app), e.g. "a door is
+  open (0x21)"; duplicate commands from Home are not re-sent, and a queued command is replaced by a
+  newer one from the same tile

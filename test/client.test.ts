@@ -132,3 +132,33 @@ test('commands are serialised and spaced', async () => {
     f.close();
   }
 });
+
+test('per-tile slots: duplicates are not re-sent; a queued command is replaced by a newer one', async () => {
+  const f = await fakeOpenLinko();
+  try {
+    const c = new OpenLinkoClient(f.url, undefined, quiet);
+    // the liftgate test run: open, open again (Home re-send), then close before open went out
+    const first = c.control('740100', 'lock');          // occupies the queue (another tile)
+    const open1 = c.control('740300', 'liftgate');
+    const open2 = c.control('740300', 'liftgate');      // duplicate -> same promise
+    assert.equal(open1, open2);
+    const close = c.control('740A00', 'liftgate');      // open hasn't gone out yet -> replaced
+    assert.equal(close, open1);
+    await Promise.all([first, close]);
+    assert.deepEqual(f.sent, ['740100', '740A00']);
+    // once a command is on its way, a different one for the same tile queues behind it
+    const a = c.control('740500', 'windows');
+    await new Promise((r) => setTimeout(r, 3100));      // let it start (3 s gap after the last send)
+    const b = c.control('740600', 'windows');
+    assert.notEqual(a, b);
+    await Promise.all([a, b]);
+    assert.deepEqual(f.sent, ['740100', '740A00', '740500', '740600']);
+    // temperature and A/C power use separate slots, so neither replaces the other
+    const on = c.control('741001', 'climate');
+    const temp = c.control('7411AC', 'climate-temp');
+    await Promise.all([on, temp]);
+    assert.deepEqual(f.sent.slice(-2), ['741001', '7411AC']);
+  } finally {
+    f.close();
+  }
+});

@@ -247,6 +247,62 @@ export class Pending<T> {
 }
 
 /** A short human message for a failed control reply. */
+// What the car's result byte means, taken from the CarLinko app (1.14.10): the response handler maps
+// each byte to a message, and the meaning is the same across command families (0x21 is "Door open,
+// window opening is not supported" for windows and "Door open, locking is not supported" for locks).
+const REFUSALS: Record<string, string> = {
+  '21': 'a door is open',
+  '22': 'a door is unlocked; lock the car first',
+  '23': 'the car is switched on',
+  '2A': 'the car is moving',
+  '2B': 'the bonnet is open',
+  '35': 'the boot is not fully closed',
+  '4D': 'maintenance mode is on (only lock and unlock work)',
+  '66': 'car control system error',
+  '75': 'the car is updating its firmware; try again later',
+  '91': "the driver's seat is occupied",
+  '92': 'the A/C failed to start',
+  '93': 'the car is not in remote mode',
+  '94': 'high-voltage system fault',
+  '95': 'battery too low',
+  '96': 'a key is inside the car',
+  '97': 'the boot is open',
+  '98': 'the registered VIN does not match the car',
+  '99': 'T-Box authentication failed',
+  '9A': 'not in P',
+  '9B': 'the hazard lights are on',
+  '9C': 'another vehicle condition',
+  '9D': 'high-voltage system fault',
+  '9E': 'high-voltage battery charge too low',
+  '9F': 'the car is unlocked; lock it first',
+  'A0': 'abnormal battery voltage',
+  'A1': 'another vehicle condition',
+  'A2': "the car's power is not OFF",
+  'A3': 'remote start limit reached; start the car by hand once',
+  'A4': 'remote start limit reached; start the car by hand once',
+  'A5': 'another vehicle condition',
+  'A6': 'low fuel pressure',
+  'A7': 'high coolant temperature',
+  'A8': '12 V battery below 11.5 V',
+  'A9': 'not in P',
+  'AB': 'the car is not charging',
+  'B0': 'child presence mode conditions not met',
+};
+
+/** Plain-words meaning of a refusal byte, or null when it isn't one we know. */
+export function refusalText(result: string | null | undefined): string | null {
+  return result ? REFUSALS[String(result).toUpperCase()] ?? null : null;
+}
+
+/**
+ * A short human message for a failed control reply. A refusal byte we know is explained in plain
+ * words with what to do (same source as OpenLinko's texts: the CarLinko app). Anything else --
+ * 0x44 "no operation permission", a rejected frame, a network error -- keeps OpenLinko's wording.
+ */
 export function controlError(r: ControlResult): string {
+  const known = refusalText(r.result);
+  if (known) {
+    return `Car refused: ${known} (0x${String(r.result).toUpperCase()})`;
+  }
   return r.reason || r.error || r.msg || (r.code ? `CarLinko code ${r.code}` : 'unknown error');
 }
