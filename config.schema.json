@@ -2,6 +2,7 @@
   "pluginAlias": "OpenLinko",
   "pluginType": "platform",
   "singular": true,
+  "customUi": true,
   "strictValidation": false,
   "headerDisplay": "Apple Home for your CarLinko car, through your own [OpenLinko](https://github.com/GodrezJr2/openlinko) dashboard. The plugin only talks to OpenLinko: it never logs in to CarLinko itself, so OpenLinko must be running and logged in with an account the car's T-Box accepts.",
   "footerDisplay": "Engine start is deliberately not exposed. Remote commands need the car to have mobile signal; a sleeping car may take a moment or not confirm.",
@@ -14,19 +15,33 @@
         "default": "OpenLinko",
         "required": true
       },
-      "url": {
-        "title": "OpenLinko dashboard URL",
+      "host": {
+        "title": "OpenLinko IP address or host name",
         "type": "string",
-        "default": "http://127.0.0.1:8088",
-        "placeholder": "http://127.0.0.1:8088",
-        "format": "uri",
-        "description": "Where your OpenLinko server runs. Same machine: http://127.0.0.1:8088."
+        "default": "127.0.0.1",
+        "placeholder": "127.0.0.1",
+        "description": "Same machine as Homebridge: 127.0.0.1."
+      },
+      "port": {
+        "title": "OpenLinko port",
+        "type": "integer",
+        "default": 8088,
+        "minimum": 1,
+        "maximum": 65535
+      },
+      "https": {
+        "title": "Use HTTPS",
+        "type": "boolean",
+        "default": false,
+        "description": "Only if OpenLinko is behind an HTTPS proxy."
       },
       "password": {
         "title": "Dashboard password",
         "type": "string",
         "description": "Only if you set a dashboard password in OpenLinko. Leave empty otherwise.",
-        "x-schema-form": { "type": "password" }
+        "x-schema-form": {
+          "type": "password"
+        }
       },
       "carName": {
         "title": "Car name",
@@ -99,13 +114,17 @@
             "title": "Home latitude",
             "type": "number",
             "placeholder": "3.1579",
-            "condition": { "functionBody": "return model.home && model.home.enabled === true;" }
+            "condition": {
+              "functionBody": "return model.home && model.home.enabled === true;"
+            }
           },
           "lng": {
             "title": "Home longitude",
             "type": "number",
             "placeholder": "101.7116",
-            "condition": { "functionBody": "return model.home && model.home.enabled === true;" }
+            "condition": {
+              "functionBody": "return model.home && model.home.enabled === true;"
+            }
           },
           "radius": {
             "title": "Radius (m)",
@@ -113,17 +132,31 @@
             "default": 150,
             "minimum": 50,
             "maximum": 5000,
-            "condition": { "functionBody": "return model.home && model.home.enabled === true;" }
+            "condition": {
+              "functionBody": "return model.home && model.home.enabled === true;"
+            }
           }
         }
       }
     }
   },
   "layout": [
-    { "type": "fieldset", "title": "Connection", "items": ["url", "password", "carName"] },
-    { "type": "fieldset", "title": "Tiles", "description": "Only tiles your car supports are created, whatever is ticked here.",
-      "items": ["lock", "lowBattery", "climate", "defaultTemp", "find", "windows", "sunroof", "liftgate", "doors"] },
-    { "type": "fieldset", "title": "Car at home", "expandable": true,
-      "items": ["home.enabled", "home.lat", "home.lng", "home.radius"] }
+    {
+      "type": "fieldset",
+      "title": "Tiles",
+      "description": "Only tiles your car supports are created, whatever is ticked here.",
+      "items": [
+        "carName",
+        "lock",
+        "lowBattery",
+        "climate",
+        "defaultTemp",
+        "find",
+        "windows",
+        "sunroof",
+        "liftgate",
+        "doors"
+      ]
+    }
   ]
 }

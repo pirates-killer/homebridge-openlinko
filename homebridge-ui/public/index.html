@@ -1,0 +1,73 @@
+<link rel="stylesheet" href="vendor/leaflet.css?v=0.1.0">
+<style>
+  .ol-card { border: 1px solid rgba(127, 127, 127, .3); border-radius: .5rem; padding: 1rem; margin-bottom: 1rem; }
+  .ol-card h5 { margin: 0 0 .25rem; }
+  .ol-hint { font-size: .85rem; opacity: .75; margin-bottom: .75rem; }
+  .ol-row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: flex-end; }
+  .ol-row > .ol-field { flex: 1 1 10rem; }
+  .ol-row > .ol-field.ol-narrow { flex: 0 1 7rem; }
+  .ol-field label { display: block; font-size: .85rem; margin-bottom: .2rem; }
+  .ol-result { margin-top: .6rem; font-size: .9rem; min-height: 1.3em; }
+  .ol-result.ok { color: #28a745; }
+  .ol-result.bad { color: #dc3545; }
+  #ol-map { height: 340px; border-radius: .4rem; margin: .75rem 0; z-index: 0; }
+  #ol-map.ol-off { opacity: .45; }
+  .ol-pin { background: #e5383b; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,.35); }
+  .ol-car { background: #1d7af3; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,.3); }
+  .ol-switch { display: flex; align-items: center; gap: .5rem; }
+  .ol-switch input { width: 1.1rem; height: 1.1rem; }
+  .leaflet-container { font: inherit; }
+  body.dark-mode .leaflet-tile-pane { filter: brightness(.8) contrast(1.1); }
+</style>
+
+<div class="ol-card">
+  <h5>OpenLinko server</h5>
+  <div class="ol-hint">Where your OpenLinko dashboard runs. Same machine as Homebridge: <code>127.0.0.1</code>, port <code>8088</code>.</div>
+  <div class="ol-row">
+    <div class="ol-field">
+      <label for="ol-host">IP address or host name</label>
+      <input id="ol-host" class="form-control" placeholder="127.0.0.1" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="ol-field ol-narrow">
+      <label for="ol-port">Port</label>
+      <input id="ol-port" class="form-control" type="number" min="1" max="65535" placeholder="8088">
+    </div>
+    <div class="ol-field ol-narrow ol-switch" style="padding-bottom:.45rem">
+      <input id="ol-https" type="checkbox"><label for="ol-https" style="margin:0">HTTPS</label>
+    </div>
+  </div>
+  <div class="ol-row" style="margin-top:.75rem">
+    <div class="ol-field">
+      <label for="ol-password">Dashboard password <span style="opacity:.6">(only if you set one in OpenLinko)</span></label>
+      <input id="ol-password" class="form-control" type="password" autocomplete="new-password">
+    </div>
+    <div class="ol-field ol-narrow" style="flex-basis:10rem">
+      <button id="ol-test" class="btn btn-primary" style="width:100%">Test connection</button>
+    </div>
+  </div>
+  <div id="ol-test-result" class="ol-result"></div>
+</div>
+
+<div class="ol-card">
+  <h5>Car at home</h5>
+  <div class="ol-hint">A "Car Home" sensor in Apple Home, on when the car is inside this circle. Click the map or drag the pin to set home, paste coordinates or a maps link, or use where the car is parked now. Needs OpenLinko's car location feature.</div>
+  <div class="ol-switch"><input id="ol-home-on" type="checkbox"><label for="ol-home-on" style="margin:0">Show a "Car Home" sensor</label></div>
+  <div id="ol-map"></div>
+  <div class="ol-row">
+    <div class="ol-field" style="flex-basis:18rem">
+      <label for="ol-paste">Paste coordinates or a Google / Apple Maps link</label>
+      <input id="ol-paste" class="form-control" placeholder="3.1579, 101.7116   or   https://maps.app.goo.gl/…" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="ol-field ol-narrow" style="flex-basis:6rem"><button id="ol-paste-go" class="btn btn-secondary" style="width:100%">Use</button></div>
+    <div class="ol-field ol-narrow" style="flex-basis:14rem"><button id="ol-car" class="btn btn-secondary" style="width:100%">Use the car's location</button></div>
+  </div>
+  <div class="ol-row" style="margin-top:.75rem">
+    <div class="ol-field"><label for="ol-lat">Latitude</label><input id="ol-lat" class="form-control" type="number" step="0.000001" min="-90" max="90"></div>
+    <div class="ol-field"><label for="ol-lng">Longitude</label><input id="ol-lng" class="form-control" type="number" step="0.000001" min="-180" max="180"></div>
+    <div class="ol-field ol-narrow"><label for="ol-radius">Radius (m)</label><input id="ol-radius" class="form-control" type="number" min="50" max="5000" step="10"></div>
+  </div>
+  <div id="ol-home-result" class="ol-result"></div>
+</div>
+
+<script src="vendor/leaflet.js?v=0.1.0"></script>
+<script src="app.js?v=0.1.0"></script>

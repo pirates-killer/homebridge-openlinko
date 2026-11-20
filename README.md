@@ -66,13 +66,24 @@ here can't affect your other accessories.
 
 ## Configuration
 
-Everything can be set in the Homebridge UI. The equivalent `config.json`:
+Open the plugin's **Settings** in the Homebridge UI. You get a page with three parts:
+
+1. **OpenLinko server.** IP address or host name, port, HTTPS (only if OpenLinko is behind an HTTPS
+   proxy), and the dashboard password if you set one in OpenLinko. **Test connection** checks it
+   and shows your car model, battery and last report time.
+2. **Car at home.** A map. Click it or drag the pin to set home, paste coordinates or a Google /
+   Apple Maps link (short `maps.app.goo.gl` share links too), or press **Use the car's location**,
+   which works well while the car is parked at home. The circle shows the radius.
+3. **Tiles.** The car name and which tiles to show.
+
+The equivalent `config.json`:
 
 ```json
 {
   "platform": "OpenLinko",
   "name": "OpenLinko",
-  "url": "http://127.0.0.1:8088",
+  "host": "127.0.0.1",
+  "port": 8088,
   "carName": "Tiggo",
   "lock": true,
   "climate": true,
@@ -89,14 +100,22 @@ Everything can be set in the Homebridge UI. The equivalent `config.json`:
 
 | Key | Default | Notes |
 |---|---|---|
-| `url` | `http://127.0.0.1:8088` | Your OpenLinko dashboard |
+| `host` | `127.0.0.1` | OpenLinko's IP address or host name |
+| `port` | `8088` | OpenLinko's port |
+| `https` | `false` | Only for an OpenLinko behind an HTTPS proxy |
 | `password` | none | Only if OpenLinko has a dashboard password |
 | `carName` | `Car` | Prefix for tile names, which is also what you say to Siri |
-| `lock`, `climate`, `find`, `windows`, `doors` | `true` | Turn tiles off you don't want |
+| `lock`, `climate`, `find`, `windows`, `doors` | `true` | Turn off tiles you don't want |
 | `sunroof`, `liftgate` | `false` | Opt in |
 | `defaultTemp` | `22` | A/C temperature shown until the car reports its own |
 | `lowBattery` | `20` | Low-battery alert threshold (%) |
 | `home` | off | `lat`, `lng`, `radius` (m, min 50). Leaving needs 1.5 × radius, so the sensor doesn't flap at the edge |
+
+### Pairing tip
+
+If Home sticks at "Connecting…" when you add the bridge, put your iPhone on the Wi-Fi of the router
+Homebridge is wired to. Some mesh systems don't pass the bridge's announcement (mDNS) from the wired
+network to Wi-Fi clients on a satellite. You only need this while pairing.
 
 ## How it behaves
 
@@ -115,6 +134,8 @@ Everything can be set in the Homebridge UI. The equivalent `config.json`:
 ## Privacy
 
 - The plugin sends nothing anywhere except your own OpenLinko server.
+- The settings page shows map tiles from OpenStreetMap. The only other outside request it makes is
+  when you paste a short Google Maps link: it asks Google where that link points.
 - The VIN never appears in logs or in Home. Accessory IDs come from a one-way hash of it.
 - No telemetry and no analytics.
 
@@ -128,6 +149,8 @@ npm pack          # homebridge-openlinko-x.y.z.tgz
 
 ## Credits
 
+- [Leaflet](https://leafletjs.com) (BSD-2-Clause, bundled in the settings page) and map data from
+  [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
 - [OpenLinko](https://github.com/GodrezJr2/openlinko) by [GodrezJr2](https://github.com/GodrezJr2),
   which does all the heavy lifting: CarLinko login, telemetry decoding, and encrypted control frames.
 - The OpenLinko community, for model decodes and testing.

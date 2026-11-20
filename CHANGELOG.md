@@ -13,4 +13,7 @@ First release.
 - Tiles created only for what the car supports (from OpenLinko `/api/controls`)
 - Live updates over OpenLinko `/api/stream`, with fallback polling
 - Works with password-protected OpenLinko dashboards
+- Settings page: OpenLinko IP/port/HTTPS/password with a "Test connection" button, and a map for
+  the home location (click, drag, paste coordinates or a Google/Apple Maps link, or use the car's
+  current position)
 - Engine start deliberately not exposed (command allow-list)

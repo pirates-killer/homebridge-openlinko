@@ -7,11 +7,15 @@ import {
   PresenceAccessory, SunroofAccessory, WindowsAccessory,
 } from './accessories.js';
 import { OpenLinkoClient } from './client.js';
+import { baseUrl } from './config.js';
 import { PLATFORM_NAME, PLUGIN_NAME, PLUGIN_VERSION } from './settings.js';
 import type { Caps, Summary } from './state.js';
 
 export interface OpenLinkoConfig extends PlatformConfig {
-  url?: string;
+  host?: string;
+  port?: number;
+  https?: boolean;
+  url?: string;          // legacy single-URL setting, used only when host is empty
   password?: string;
   carName?: string;
   lock?: boolean;
@@ -41,6 +45,7 @@ const RETRY_SETUP_MS = 60_000;
 
 export class OpenLinkoPlatform implements DynamicPlatformPlugin {
   readonly client: OpenLinkoClient;
+  readonly url: string;
   readonly version = PLUGIN_VERSION;
   readonly carName: string;
   readonly defaultTemp: number;
@@ -58,8 +63,8 @@ export class OpenLinkoPlatform implements DynamicPlatformPlugin {
   private warnedGuard = false;
 
   constructor(readonly log: Logging, readonly config: OpenLinkoConfig, readonly api: API) {
-    const url = (config.url || 'http://127.0.0.1:8088').trim();
-    this.client = new OpenLinkoClient(url, config.password || undefined, log);
+    this.url = baseUrl(config);
+    this.client = new OpenLinkoClient(this.url, config.password || undefined, log);
     this.carName = (config.carName || 'Car').trim();
     this.defaultTemp = Number(config.defaultTemp) || 22;
     this.lowBattery = Number.isFinite(config.lowBattery) ? Number(config.lowBattery) : 20;
@@ -140,7 +145,7 @@ export class OpenLinkoPlatform implements DynamicPlatformPlugin {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!cache.caps) {
-        this.log.error(`Can't reach OpenLinko (${msg}). Retrying in 60 s. Is the dashboard running at ${this.config.url || 'http://127.0.0.1:8088'}?`);
+        this.log.error(`Can't reach OpenLinko (${msg}). Retrying in 60 s. Is the dashboard running at ${this.url}?`);
         // keep restored accessories as they are (showing No Response) until OpenLinko answers
         setTimeout(() => void this.setup(), RETRY_SETUP_MS);
         return;
