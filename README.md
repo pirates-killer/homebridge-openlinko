@@ -111,6 +111,8 @@ The equivalent `config.json`:
 | `defaultTemp` | `22` | A/C temperature shown until the car reports its own |
 | `lowBattery` | `20` | Low-battery alert threshold (%) |
 | `home` | off | `lat`, `lng`, `radius` (m, min 50). Leaving needs 1.5 × radius, so the sensor doesn't flap at the edge |
+| `mapTileUrl` | OpenStreetMap | Settings-page map only. Another tile server: https, with `{z}`, `{x}`, `{y}`. You then follow its terms |
+| `mapAttribution` | none | The credit that other server requires, shown on the map |
 
 ### Pairing tip
 
