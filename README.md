@@ -135,7 +135,9 @@ network to Wi-Fi clients on a satellite. You only need this while pairing.
 ## Privacy
 
 - The plugin (the part running in Homebridge) talks only to your own OpenLinko server.
-- The settings page also loads map tiles for the area you're looking at. See *Licences and policies*.
+- The settings page's map loads tiles for the area you're looking at, straight from OpenStreetMap
+  in your browser. OSM sees your IP address and the Homebridge UI's address (as the Referer).
+  See *Licences and policies*.
   Pasted links and coordinates are read on your machine; nothing is looked up online.
 - The VIN never appears in logs or in Home. Accessory IDs come from a one-way hash of it.
 - No telemetry and no analytics.
@@ -146,9 +148,10 @@ network to Wi-Fi clients on a satellite. You only need this while pairing.
 - Bundled: [Leaflet](https://leafletjs.com) 1.9.4, BSD-2-Clause. Its licence ships with it. See
   [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 - Settings-page map: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, data
-  under the ODbL. Tiles are used under the [OSMF Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/):
-  an identifying User-Agent, the server's caching headers honoured (with conditional requests),
-  only the tiles on screen, no prefetch or offline use, and the credit always visible on the map.
+  under the ODbL. Tiles are used under the [OSMF Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/)
+  the way it expects of web pages: your browser loads them directly, sends the page's origin as
+  Referer, and its cache honours OSM's caching headers. Only the tiles on screen are loaded, with no
+  prefetch, and the credit is always visible on the map.
   Details in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 - Contact: [GitHub issues](https://github.com/pirates-killer/homebridge-openlinko/issues).
 

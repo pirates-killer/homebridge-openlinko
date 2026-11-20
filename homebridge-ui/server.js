@@ -1,17 +1,11 @@
 // Backend of the plugin's settings page. Runs inside the Homebridge UI (admin login required),
-// never inside the bridge. It talks to two places only:
-//   - your OpenLinko server (Test connection, the car's location), like the plugin itself
-//   - the map tile server, for the tiles you are looking at, under the OSMF Tile Usage Policy
-//     (see src/tiles.ts)
+// never inside the bridge. Like the plugin itself, it talks only to your OpenLinko server.
+// (The map tiles are loaded by the browser directly; see public/app.js.)
 
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { HomebridgePluginUiServer, RequestError } from '@homebridge/plugin-ui-utils';
+import { HomebridgePluginUiServer } from '@homebridge/plugin-ui-utils';
 import { OpenLinkoClient } from '../dist/client.js';
 import { baseUrl } from '../dist/config.js';
 import { isShortMapsLink, parseLatLng } from '../dist/geo.js';
-import { TILE_USER_AGENT } from '../dist/settings.js';
-import { OSM_TILE_URL, TileError, TileFetcher, validTileUrl } from '../dist/tiles.js';
 
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
 
@@ -37,32 +31,6 @@ function reason(e) {
 class OpenLinkoUiServer extends HomebridgePluginUiServer {
   constructor() {
     super();
-    const cacheRoot = join(this.homebridgeStoragePath || tmpdir(), 'homebridge-openlinko', 'tiles');
-    const fetchers = new Map();
-    const fetcherFor = (url) => {
-      const u = validTileUrl(url || OSM_TILE_URL);
-      if (!u) {
-        throw new RequestError('the map tile URL must be https and contain {z}, {x} and {y}', { status: 400 });
-      }
-      if (!fetchers.has(u)) {
-        fetchers.set(u, new TileFetcher({ dir: cacheRoot, userAgent: TILE_USER_AGENT, url: u }));
-      }
-      return fetchers.get(u);
-    };
-
-    // One map tile the page is showing, as a data URL (the page's own requests can't reach OSM).
-    this.onRequest('/tile', async ({ z, x, y, url } = {}) => {
-      try {
-        const png = await fetcherFor(url).get(Number(z), Number(x), Number(y));
-        return { ok: true, data: png.toString('base64') };
-      } catch (e) {
-        if (e instanceof RequestError) {
-          throw e;
-        }
-        return { ok: false, error: e instanceof TileError || e instanceof RangeError ? e.message : reason(e) };
-      }
-    });
-
     // "Test connection": the same calls the plugin makes at startup.
     this.onRequest('/test', async (conn) => {
       const url = baseUrl(conn ?? {});

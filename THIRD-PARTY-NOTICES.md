@@ -50,18 +50,21 @@ The map on the plugin's settings page shows tiles from the OpenStreetMap Foundat
 servers. Map data © OpenStreetMap contributors, available under the Open Database License (ODbL):
 https://www.openstreetmap.org/copyright.
 
-Tile use follows the OSMF Tile Usage Policy (https://operations.osmfoundation.org/policies/tiles/):
+Tile use follows the OSMF Tile Usage Policy (https://operations.osmfoundation.org/policies/tiles/),
+in the way it expects of web pages:
 
-- requests go to `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, with a User-Agent naming this
-  plugin and its homepage (`homebridge-openlinko/<version> (+https://github.com/pirates-killer/homebridge-openlinko)`)
-- server caching headers (`Cache-Control`, `Expires`, `ETag`) are honoured. Expired tiles are
-  revalidated with conditional requests, and tiles without caching headers are kept for 7 days.
-  No no-cache headers are ever sent.
-- only tiles shown on screen are fetched: no prefetch, no bulk download, no offline use. A hard
-  limit of 300 tile downloads per 10 minutes backs this up.
+- your browser loads the tiles straight from `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, with
+  its own User-Agent. Its HTTP cache honours OSM's caching headers. There is no proxy, which the
+  policy doesn't recommend.
+- a valid Referer is sent. The Homebridge UI serves its pages with `Referrer-Policy: no-referrer`,
+  which the policy forbids for tile requests, so the map tiles set their own
+  `referrerPolicy="strict-origin-when-cross-origin"`. The browser then sends only the page's
+  origin (e.g. `http://192.168.1.50:8581`).
+- only the tiles in view are requested, once panning or zooming stops. There's no prefetch, no bulk
+  download and no offline use.
 - the credit "© OpenStreetMap contributors" (linked to the copyright page) and a "Report a map
-  issue" link are shown on the map at all times
-- the tile server can be changed in the settings, without a software update, as the policy
+  issue" link stay visible on the map
+- the tile server can be changed in the settings without a software update, as the policy
   recommends. Anyone who switches servers must follow that server's terms and show its credit.
 
 The plugin itself, the part that runs in Homebridge, never contacts OpenStreetMap.

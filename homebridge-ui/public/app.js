@@ -226,8 +226,13 @@
   }
 
   // ---- map tiles ----
-  // Tiles come through the settings backend (see src/tiles.ts for why and for the OSM tile policy
-  // it follows). Attribution stays visible on the map, bottom-right, as the policy requires.
+  // The browser loads tiles straight from the tile server, as the OSMF Tile Usage Policy expects
+  // of web pages (https://operations.osmfoundation.org/policies/tiles/): the browser's own
+  // User-Agent and HTTP cache (which honours the server's caching headers), and a valid Referer.
+  // The Homebridge UI serves this page with "Referrer-Policy: no-referrer", which the policy
+  // forbids for tile requests, so the tiles carry their own referrerPolicy: the browser then sends
+  // this page's origin (e.g. http://192.168.1.50:8581) -- never the path or anything else.
+  // Leaflet requests only the tiles in view. Attribution stays visible on the map, bottom-right.
 
   const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
@@ -238,48 +243,36 @@
     return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  function tileFailed(why) {
+  function tileFailed() {
     if (tileNoteShown) {
       return;
     }
     tileNoteShown = true;
-    say($('ol-map-note'), `The map background couldn't load (${why}). Setting home still works: click the map, paste coordinates, or use the car's location.`, 'bad');
+    say($('ol-map-note'), 'Some map tiles could not load. Setting home still works: click the map, paste coordinates, or use the car\'s location.', 'bad');
+  }
+
+  function validTileUrl(u) {
+    return /^https:\/\/[^/\s]+\/\S*$/i.test(u) && ['{z}', '{x}', '{y}'].every((p) => u.includes(p)) ? u : '';
   }
 
   function tileLayer(cfg) {
-    const custom = typeof cfg.mapTileUrl === 'string' && cfg.mapTileUrl.trim() ? cfg.mapTileUrl.trim() : '';
+    const custom = validTileUrl(typeof cfg.mapTileUrl === 'string' ? cfg.mapTileUrl.trim() : '');
+    if (cfg.mapTileUrl && !custom) {
+      say($('ol-map-note'), 'The map tile server setting must be https and contain {z}, {x} and {y}; using OpenStreetMap.', 'bad');
+    }
     const attribution = custom
       ? escapeHtml(cfg.mapAttribution || `Map tiles: ${(() => { try { return new URL(custom.replace(/\{[zxy]\}/g, '0')).hostname; } catch { return 'custom server'; } })()}`)
       : OSM_ATTRIBUTION;
-    const Layer = L.TileLayer.extend({
-      createTile(coords, done) {
-        const img = document.createElement('img');
-        img.alt = '';
-        img.setAttribute('role', 'presentation');
-        hb.request('/tile', { z: coords.z, x: coords.x, y: coords.y, url: custom || undefined }).then((r) => {
-          if (r && r.ok) {
-            img.onload = () => done(null, img);
-            img.onerror = () => done(new Error('bad tile'), img);
-            img.src = 'data:image/png;base64,' + r.data;
-          } else {
-            tileFailed((r && r.error) || 'no tile');
-            done(new Error((r && r.error) || 'no tile'), img);
-          }
-        }, (e) => {
-          tileFailed(e.message || String(e));
-          done(e, img);
-        });
-        return img;
-      },
-    });
-    // Only the tiles in view, once panning/zooming settles: no in-between zoom levels, no prefetch.
-    return new Layer(custom || OSM_URL, {
+    const layer = L.tileLayer(custom || OSM_URL, {
       maxZoom: 19,
       attribution,
-      updateWhenIdle: true,
-      updateWhenZooming: false,
+      referrerPolicy: 'strict-origin-when-cross-origin',   // send this page's origin as Referer
+      updateWhenIdle: true,                                // only once panning/zooming settles,
+      updateWhenZooming: false,                            // no in-between zoom levels
       keepBuffer: 1,
     });
+    layer.on('tileerror', tileFailed);
+    return layer;
   }
 
   // ---- start ----

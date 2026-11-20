@@ -15,7 +15,6 @@ First release.
 - Works with password-protected OpenLinko dashboards
 - Settings page: OpenLinko IP/port/HTTPS/password with a "Test connection" button, and a map for
   the home location (click, drag, paste coordinates or a Google/Apple Maps link, or use the car's
-  current position). Map tiles are fetched by the settings backend under the OSMF Tile Usage
-  Policy (identifying User-Agent, caching headers honoured, conditional revalidation, no prefetch),
-  with the OpenStreetMap credit always on the map
+  current position). Map tiles follow the OSMF Tile Usage Policy: loaded by the browser with the
+  page's origin as Referer, only what's on screen, the OpenStreetMap credit always on the map
 - Engine start deliberately not exposed (command allow-list)
