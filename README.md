@@ -8,6 +8,9 @@ own [OpenLinko](https://github.com/GodrezJr2/openlinko) dashboard.
 
 > "Hey Siri, lock the Tiggo." · "Turn on the Tiggo A/C." · *When the car gets home, turn on the porch light.*
 
+**New here? Read the [full guide](docs/GUIDE.md):** CarLinko accounts and permissions, setup,
+every tile, Siri and automations, refusal codes, troubleshooting.
+
 This is a **companion to OpenLinko, not a replacement**. The plugin only talks to your OpenLinko
 server's local API. It never logs in to CarLinko itself, so:
 
@@ -64,6 +67,9 @@ Search for **OpenLinko** in the Homebridge UI's Plugins tab, or:
 ```sh
 npm install -g homebridge-openlinko
 ```
+
+Before it's on npm, install from GitHub: `npm install -g github:pirates-killer/homebridge-openlinko`
+(more in the [guide](docs/GUIDE.md#4-install-the-plugin)).
 
 I recommend running it as a **child bridge** (Homebridge UI → plugin → *Bridge Settings*), so a hiccup
 here can't affect your other accessories.
@@ -175,6 +181,8 @@ npm install
 npm test          # builds, then runs unit tests + a fake-OpenLinko client test
 npm pack          # homebridge-openlinko-x.y.z.tgz
 ```
+
+Code layout, safe testing next to a real Homebridge, and releasing: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Credits
 
