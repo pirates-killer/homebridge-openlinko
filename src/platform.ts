@@ -32,6 +32,7 @@ export interface OpenLinkoConfig extends PlatformConfig {
   doors?: boolean;
   lowBattery?: number;
   home?: { enabled?: boolean; lat?: number; lng?: number; radius?: number };
+  logStates?: boolean;
 }
 
 type Kind = 'lock' | 'charging' | 'climate' | 'find' | 'windows' | 'windowsVent' | 'windowSensors'
@@ -45,7 +46,8 @@ interface Cache {
 
 const UNREACHABLE_MS = 5 * 60_000;   // OpenLinko silent this long (stream down, polls failing) -> "No Response"
 const POLL_MS = 60_000;              // fallback poll while the stream is down
-const LOCATION_MS = 60_000;          // /api/location is a local DB read on the OpenLinko side
+const LOCATION_MS = 30_000;          // /api/location is a local DB read on the OpenLinko side; the car-at-home
+                                     // sensor then follows a new fix within ~30 s instead of up to a minute
 const RETRY_SETUP_MS = 60_000;
 
 export class OpenLinkoPlatform implements DynamicPlatformPlugin {
@@ -55,6 +57,7 @@ export class OpenLinkoPlatform implements DynamicPlatformPlugin {
   readonly carName: string;
   readonly defaultTemp: number;
   readonly lowBattery: number;
+  readonly logStates: boolean;
   model = '';
   serial = 'OpenLinko';
   summary: Summary = {};
@@ -73,6 +76,7 @@ export class OpenLinkoPlatform implements DynamicPlatformPlugin {
     this.carName = (config.carName || 'Car').trim();
     this.defaultTemp = Number(config.defaultTemp) || 22;
     this.lowBattery = Number.isFinite(config.lowBattery) ? Number(config.lowBattery) : 20;
+    this.logStates = config.logStates === true;
     this.cachePath = join(api.user.storagePath(), 'homebridge-openlinko.json');
     api.on('didFinishLaunching', () => void this.setup());
     api.on('shutdown', () => this.client.stop());

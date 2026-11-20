@@ -123,6 +123,7 @@ The equivalent `config.json`:
 | `home` | off | `lat`, `lng`, `radius` (m, min 50). Leaving needs 1.5 × radius, so the sensor doesn't flap at the edge |
 | `mapTileUrl` | OpenStreetMap | Settings-page map only. Another tile server: https, with `{z}`, `{x}`, `{y}`. You then follow its terms |
 | `mapAttribution` | none | The credit that other server requires, shown on the map |
+| `logStates` | `false` | Log each change of what Home shows (lock, doors, windows, A/C, charging), to compare with your phone's notifications |
 
 ### Pairing tip
 
@@ -142,6 +143,11 @@ network to Wi-Fi clients on a satellite. You only need this while pairing.
   CarLinko app itself uses: *"Car refused: a door is open (0x21)"*, *"a door is unlocked; lock the car
   first (0x22)"*, *"the car is moving (0x2A)"*. Permission errors keep OpenLinko's wording (*"No
   operation permission"*).
+- **Lock notifications:** many cars unlock themselves when put in P and lock themselves once
+  moving (a Tiggo 7 CSH at about 17 km/h). Each is a real change, so Home notifies it: a stop
+  where you get out and come back is about four notifications. Turn them off on the lock tile in
+  Home if that's too many. The plugin tells Home the lock's target before its current state, so
+  the notification text matches what the car did.
 - A **sleeping car** may accept a command without confirming it. The tile keeps the new state for up to 2 minutes
   while the car wakes up and reports, then follows the car.
 - **Windows and sunroof** are tap-to-open/close tiles, plus Vent and Tilt switches, because the car

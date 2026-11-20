@@ -255,11 +255,16 @@ command frame at all. That usually means an old OpenLinko that doesn't encrypt c
 | Fewer tiles than expected | your car's config says it doesn't support them, or they're off in settings | check `/api/controls` in OpenLinko |
 | Map on the settings page shows "blocked" tiles | the page was opened as `localhost` (OpenStreetMap refuses that), or no internet | open the Homebridge UI on its LAN address |
 | "Car Home" never changes | location off in OpenLinko, or no position yet | `"location": true` in OpenLinko; check its Location card |
+| A lock notification at every stop | the car unlocks itself in P and locks itself once moving; each is a real change | normal; turn off notifications on the lock tile in Home if you don't want them |
+| A notification says "unlocked" when the car locked | plugin 0.1.0 told Home the current state before the target | update the plugin (fixed after 0.1.0) |
+| The log shows a command twice | Home asked twice; the second line says *"already on its way, not sent again"* | nothing to do: the car got it once |
 | Pairing stuck at "Connecting…" | mesh Wi-Fi drops mDNS | section 6 |
 | Had to re-pair after a change | bridge identity changed | section 6 |
 
 **Logs:** every command and its result is in the Homebridge log, e.g.
-`[OpenLinko] Tiggo: lock — done`. When asking for help, include your car model, region, OpenLinko
+`[OpenLinko] Tiggo: lock — done`. To see what Home was shown and when, turn on **Log what Home
+shows** (`logStates`, under Troubleshooting in settings): each change gets a line like
+`[OpenLinko] Tiggo: Home shows lock Locked`. When asking for help, include your car model, region, OpenLinko
 version and those lines. **Never post your VIN, plate, account email or location.**
 
 ## 11. Performance

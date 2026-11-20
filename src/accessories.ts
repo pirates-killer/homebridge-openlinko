@@ -1,4 +1,4 @@
-import type { CharacteristicValue, PlatformAccessory, Service, WithUUID } from 'homebridge';
+import type { Characteristic, CharacteristicValue, PlatformAccessory, Service, WithUUID } from 'homebridge';
 import type { OpenLinkoPlatform } from './platform.js';
 import {
   OP, Pending, WINDOW_NAMES, anyDoorOpen, anyWindowOpen, atHome, controlError, decodeSetPoint, snapTemp,
@@ -7,6 +7,8 @@ import {
 } from './state.js';
 
 const HOLD_MS = 120_000;   // how long a commanded state wins over not-yet-updated telemetry
+const LOCK_NAMES = ['Unlocked', 'Locked', 'Jammed', 'Unknown'];                 // LockCurrentState 0-3
+const DOOR_NAMES = ['open', 'closed', 'opening', 'closing', 'stopped'];         // CurrentDoorState 0-4
 
 /** Base: owns one PlatformAccessory, gets every summary, sends commands through the platform. */
 export abstract class CarAccessory {
@@ -49,16 +51,41 @@ export abstract class CarAccessory {
 
   abstract update(s: Summary): void;
 
+  private readonly pushed = new Map<string, CharacteristicValue>();
+
+  /**
+   * Tell HomeKit a characteristic's value. With `logStates` on, a change is also logged as what
+   * Home now shows (the text a Home notification is based on), so a field test can be matched
+   * against the phone afterwards instead of being reconstructed.
+   */
+  protected push(svc: Service, char: CharType, value: CharacteristicValue, describe?: (v: CharacteristicValue) => string): void {
+    svc.updateCharacteristic(char, value);
+    if (!describe || !this.platform.logStates) {
+      return;
+    }
+    const key = `${svc.UUID}/${svc.subtype ?? ''}/${char.UUID}`;
+    const before = this.pushed.get(key);
+    this.pushed.set(key, value);
+    if (before !== value) {
+      this.platform.log.info(`${this.label}: Home shows ${describe(value)}${before === undefined ? ' (start)' : ''}`);
+    }
+  }
+
   /**
    * Fire a command without blocking HomeKit (the car can take 20 s; Home shows "No Response"
    * after ~10 s). onDone gets the verdict; failures are logged with OpenLinko's own reason.
+   * Home sometimes asks twice; the client then shares the first command instead of sending a
+   * second one, and the log says so rather than looking like two sends.
    */
   protected send(op: string, what: string, onDone: (ok: boolean, confirmed: boolean) => void,
     slot = String(this.accessory.context.kind)): void {
-    this.platform.log.info(`${this.label}: ${what}`);
+    const dup = this.platform.client.isQueued(op, slot);
+    this.platform.log.info(`${this.label}: ${what}${dup ? ' (already on its way, not sent again)' : ''}`);
     this.platform.client.control(op, slot).then(
       (r: ControlResult) => {
-        if (r.ok) {
+        if (dup) {
+          // the first request logs the result
+        } else if (r.ok) {
           this.platform.log.info(`${this.label}: ${what} — ${r.confirmed ? 'done' : 'sent (the car did not confirm yet)'}`);
         } else {
           this.platform.log.warn(`${this.label}: ${what} failed — ${controlError(r)}`);
@@ -67,12 +94,16 @@ export abstract class CarAccessory {
         this.platform.refreshSoon();
       },
       (e: unknown) => {
-        this.platform.log.error(`${this.label}: ${what} failed — ${e instanceof Error ? e.message : String(e)}`);
+        if (!dup) {
+          this.platform.log.error(`${this.label}: ${what} failed — ${e instanceof Error ? e.message : String(e)}`);
+        }
         onDone(false, false);
       },
     );
   }
 }
+
+type CharType = WithUUID<new () => Characteristic>;
 
 // ---------------------------------------------------------------------------------------------
 
@@ -147,8 +178,12 @@ export class LockAccessory extends CarAccessory {
 
   update(s: Summary): void {
     const { C } = this;
-    this.lock.updateCharacteristic(C.LockCurrentState, this.currentState(s));
-    this.lock.updateCharacteristic(C.LockTargetState, this.targetState(s));
+    // Target first, then current. The other way round, Home briefly sees e.g. "current locked,
+    // target unlocked" (an unlock in progress) whenever the car locks itself, and its notification
+    // came out as "was unlocked". The liftgate below has always done it in this order.
+    this.push(this.lock, C.LockTargetState, this.targetState(s),
+      (v) => `lock target ${v === C.LockTargetState.SECURED ? 'Locked' : 'Unlocked'}`);
+    this.push(this.lock, C.LockCurrentState, this.currentState(s), (v) => `lock ${LOCK_NAMES[Number(v)] ?? v}`);
     if (typeof s.battery === 'number') {
       this.battery.updateCharacteristic(C.BatteryLevel, Math.max(0, Math.min(100, s.battery)));
     }
@@ -257,7 +292,7 @@ export class ClimateAccessory extends CarAccessory {
     if (reported !== null && !this.wanted.active) {
       this.setPoint = snapTemp(reported, this.caps);
     }
-    this.svc.updateCharacteristic(C.Active, this.activeState(s));
+    this.push(this.svc, C.Active, this.activeState(s), (v) => `A/C ${v === C.Active.ACTIVE ? 'on' : 'off'}`);
     this.svc.updateCharacteristic(C.CurrentHeaterCoolerState, this.coolerState(s));
     this.svc.updateCharacteristic(C.CurrentTemperature, this.temp(s));
     this.svc.updateCharacteristic(C.CoolingThresholdTemperature, this.temp(s));
@@ -344,8 +379,9 @@ abstract class OpenCloseAccessory extends CarAccessory {
 
   update(s: Summary): void {
     const { C } = this;
-    this.svc.updateCharacteristic(C.CurrentPosition, this.current(s));
+    // target before current, as for the lock: no momentary "moving the other way" in Home
     this.svc.updateCharacteristic(C.TargetPosition, this.targetPos(s));
+    this.push(this.svc, C.CurrentPosition, this.current(s), (v) => `${this.cmd.thing} ${v === 100 ? 'open' : 'closed'}`);
     this.svc.updateCharacteristic(C.PositionState, this.posState(s));
   }
 }
@@ -407,7 +443,7 @@ export class ModeSwitchAccessory extends CarAccessory {
   }
 
   update(s: Summary): void {
-    this.svc.updateCharacteristic(this.C.On, this.state(s));
+    this.push(this.svc, this.C.On, this.state(s), (v) => `${v ? 'on' : 'off'}`);
   }
 }
 
@@ -449,7 +485,9 @@ export class WindowStatusAccessory extends CarAccessory {
   }
 
   update(s: Summary): void {
-    this.sensors.forEach((svc, i) => svc.updateCharacteristic(this.C.ContactSensorState, this.state(s, i)));
+    const { C } = this;
+    this.sensors.forEach((svc, i) => this.push(svc, C.ContactSensorState, this.state(s, i),
+      (v) => `${WINDOW_NAMES[i]} window ${v === C.ContactSensorState.CONTACT_DETECTED ? 'closed' : 'open'}`));
   }
 }
 
@@ -469,7 +507,9 @@ export class ChargingAccessory extends CarAccessory {
   }
 
   update(s: Summary): void {
-    this.svc.updateCharacteristic(this.C.OccupancyDetected, this.state(s));
+    const { C } = this;
+    this.push(this.svc, C.OccupancyDetected, this.state(s),
+      (v) => (v === C.OccupancyDetected.OCCUPANCY_DETECTED ? 'charging' : 'not charging'));
   }
 }
 
@@ -526,7 +566,7 @@ export class LiftgateAccessory extends CarAccessory {
 
   update(s: Summary): void {
     this.svc.updateCharacteristic(this.C.TargetDoorState, this.targetState(s));
-    this.svc.updateCharacteristic(this.C.CurrentDoorState, this.currentState(s));
+    this.push(this.svc, this.C.CurrentDoorState, this.currentState(s), (v) => `liftgate ${DOOR_NAMES[Number(v)] ?? v}`);
   }
 }
 
@@ -549,7 +589,9 @@ export class DoorsAccessory extends CarAccessory {
   }
 
   update(s: Summary): void {
-    this.svc.updateCharacteristic(this.C.ContactSensorState, this.state(s));
+    const { C } = this;
+    this.push(this.svc, C.ContactSensorState, this.state(s),
+      (v) => `doors ${v === C.ContactSensorState.CONTACT_DETECTED ? 'closed' : 'open'}`);
   }
 }
 

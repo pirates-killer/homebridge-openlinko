@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Fixes from the first evening of driving with the plugin (Tiggo 7 CSH, 2026-11-20).
+
+- **Lock notifications said the opposite** ("was unlocked" when the car locked itself). The lock
+  now tells Home its target state before its current state, as the liftgate already did, so Home
+  never sees a lock "in progress the other way". The window and sunroof tiles do the same.
+- A request Home sends twice is still sent to the car once, and the log now says so (*"already on
+  its way, not sent again"*) instead of looking like two commands.
+- New option **Log what Home shows** (`logStates`, off by default): one log line per change of a
+  tile's state, to compare with the phone's notifications.
+- The car-at-home sensor checks OpenLinko's position every 30 s (was 60 s).
+
 ## 0.1.0 (2026-11-20)
 
 First release.

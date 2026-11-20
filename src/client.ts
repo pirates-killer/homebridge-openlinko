@@ -122,6 +122,11 @@ export class OpenLinkoClient extends EventEmitter {
    *  - a command that hasn't gone out yet is replaced by a newer one (open then close: only close
    *    is sent; a dragged temperature slider: only the last value).
    */
+  /** True when control(op, slot) would share a command that's already queued or on its way. */
+  isQueued(op: string, slot?: string): boolean {
+    return !!slot && this.slots.get(slot)?.op === op;
+  }
+
   control(op: string, slot?: string): Promise<ControlResult> {
     if (!isAllowedOp(op)) {
       return Promise.reject(new Error(`opcode ${op} is not allowed by this plugin`));
