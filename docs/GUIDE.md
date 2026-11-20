@@ -269,16 +269,29 @@ version and those lines. **Never post your VIN, plate, account email or location
 
 ## 11. Performance
 
-The plugin itself is light: about 100 MB of RAM and ~0% CPU when idle.
+The plugin itself is light: ~0% CPU when idle, and about 100–200 MB of RAM for the whole bridge
+process, depending on the machine (about 110 MB on a laptop, about 190 MB on a Raspberry Pi 5).
+Measured on a field-test bridge and in soak tests (thousands of updates and reconnects): memory stays
+flat, with no leak.
+
+Home never waits on the network. Tile reads come from the plugin's memory and a tap is answered in a
+few milliseconds, even when the car takes 20 s to reply or OpenLinko is slow or down. If OpenLinko is
+unreachable for 5 minutes, the tiles show *No Response*. When it is back, they recover within seconds
+(up to a minute after a long outage).
 
 It keeps OpenLinko's live stream open, so tiles update the moment the car reports. While any live
 client is connected (this plugin, or an OpenLinko dashboard tab left open), OpenLinko rebuilds its
-whole summary each time the car reports, roughly every 30 s. That rebuild goes through your whole
-history. With a big history it costs real CPU on OpenLinko's side. On a Raspberry Pi 5 with ~760k
-stored frames, that's about 5 s at 100% of one core per rebuild, ~15–20% of one core on average,
-and a few degrees warmer. It's safe, but it grows as the history grows. It's an OpenLinko
-characteristic rather than this plugin's (an open dashboard tab costs the same), and the place to
-improve it is upstream.
+whole summary each time the car reports, and at least every 30 s. That rebuild goes through your whole
+history, so it costs real CPU on OpenLinko's side. On a Raspberry Pi 5 with ~765k stored frames (about
+four months), that is:
+- about 5 s of one core per rebuild, ~15–20% of one core on average, and a few degrees warmer;
+- while driving, state updates (not commands) reach Home about that much later;
+- about 0.5 GB of RAM for OpenLinko's server.
+
+It's safe, but it grows with the history (a car logged all the time adds about 6,500 frames a day).
+It's an OpenLinko characteristic rather than this plugin's: an open dashboard tab costs the same, and
+a Home Assistant REST sensor polling every 60 s causes a rebuild per poll (see OpenLinko
+[#17](https://github.com/GodrezJr2/openlinko/issues/17)). The place to improve it is upstream.
 
 ## 12. FAQ
 
