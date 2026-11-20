@@ -17,6 +17,7 @@
   .ol-switch { display: flex; align-items: center; gap: .5rem; }
   .ol-switch input { width: 1.1rem; height: 1.1rem; }
   .leaflet-container { font: inherit; }
+  .leaflet-control-attribution { font-size: 11px; }   /* the OSM credit: always visible, never hidden */
   body.dark-mode .leaflet-tile-pane { filter: brightness(.8) contrast(1.1); }
 </style>
 
@@ -53,10 +54,11 @@
   <div class="ol-hint">A "Car Home" sensor in Apple Home, on when the car is inside this circle. Click the map or drag the pin to set home, paste coordinates or a maps link, or use where the car is parked now. Needs OpenLinko's car location feature.</div>
   <div class="ol-switch"><input id="ol-home-on" type="checkbox"><label for="ol-home-on" style="margin:0">Show a "Car Home" sensor</label></div>
   <div id="ol-map"></div>
+  <div id="ol-map-note" class="ol-result" style="margin-top:-.4rem"></div>
   <div class="ol-row">
     <div class="ol-field" style="flex-basis:18rem">
-      <label for="ol-paste">Paste coordinates or a Google / Apple Maps link</label>
-      <input id="ol-paste" class="form-control" placeholder="3.1579, 101.7116   or   https://maps.app.goo.gl/…" autocomplete="off" spellcheck="false">
+      <label for="ol-paste">Paste coordinates or a full Google / Apple Maps link</label>
+      <input id="ol-paste" class="form-control" placeholder="3.1579, 101.7116   or   a full Google / Apple Maps link" autocomplete="off" spellcheck="false">
     </div>
     <div class="ol-field ol-narrow" style="flex-basis:6rem"><button id="ol-paste-go" class="btn btn-secondary" style="width:100%">Use</button></div>
     <div class="ol-field ol-narrow" style="flex-basis:14rem"><button id="ol-car" class="btn btn-secondary" style="width:100%">Use the car's location</button></div>

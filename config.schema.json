@@ -137,6 +137,17 @@
             }
           }
         }
+      },
+      "mapTileUrl": {
+        "title": "Map tile server (settings page only)",
+        "type": "string",
+        "placeholder": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "description": "Leave empty to use OpenStreetMap. Another server must be https with {z}, {x} and {y}; you then have to follow that server's terms and fill in its required credit below."
+      },
+      "mapAttribution": {
+        "title": "Map credit for that server",
+        "type": "string",
+        "description": "Shown on the map, as most tile servers require. Not needed for OpenStreetMap (its credit is built in)."
       }
     }
   },
@@ -156,6 +167,17 @@
         "sunroof",
         "liftgate",
         "doors"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Settings page map",
+      "expandable": true,
+      "expanded": false,
+      "description": "The map on this page uses OpenStreetMap tiles, under the OSMF Tile Usage Policy.",
+      "items": [
+        "mapTileUrl",
+        "mapAttribution"
       ]
     }
   ]

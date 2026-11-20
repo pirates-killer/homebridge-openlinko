@@ -35,7 +35,8 @@
     "config.schema.json",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "engines": {
     "homebridge": "^1.8.0 || ^2.0.0",

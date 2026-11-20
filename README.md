@@ -71,9 +71,10 @@ Open the plugin's **Settings** in the Homebridge UI. You get a page with three p
 1. **OpenLinko server.** IP address or host name, port, HTTPS (only if OpenLinko is behind an HTTPS
    proxy), and the dashboard password if you set one in OpenLinko. **Test connection** checks it
    and shows your car model, battery and last report time.
-2. **Car at home.** A map. Click it or drag the pin to set home, paste coordinates or a Google /
-   Apple Maps link (short `maps.app.goo.gl` share links too), or press **Use the car's location**,
-   which works well while the car is parked at home. The circle shows the radius.
+2. **Car at home.** A map. Click it or drag the pin to set home, paste coordinates or a full
+   Google / Apple Maps link, or press **Use the car's location**, which works well while the car is
+   parked at home. The circle shows the radius. (Short `maps.app.goo.gl` links hide the coordinates:
+   open one in a browser first, then paste the full address.)
 3. **Tiles.** The car name and which tiles to show.
 
 The equivalent `config.json`:
@@ -133,11 +134,23 @@ network to Wi-Fi clients on a satellite. You only need this while pairing.
 
 ## Privacy
 
-- The plugin sends nothing anywhere except your own OpenLinko server.
-- The settings page shows map tiles from OpenStreetMap. The only other outside request it makes is
-  when you paste a short Google Maps link: it asks Google where that link points.
+- The plugin (the part running in Homebridge) talks only to your own OpenLinko server.
+- The settings page also loads map tiles for the area you're looking at. See *Licences and policies*.
+  Pasted links and coordinates are read on your machine; nothing is looked up online.
 - The VIN never appears in logs or in Home. Accessory IDs come from a one-way hash of it.
 - No telemetry and no analytics.
+
+## Licences and policies
+
+- This plugin: MIT.
+- Bundled: [Leaflet](https://leafletjs.com) 1.9.4, BSD-2-Clause. Its licence ships with it. See
+  [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+- Settings-page map: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, data
+  under the ODbL. Tiles are used under the [OSMF Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/):
+  an identifying User-Agent, the server's caching headers honoured (with conditional requests),
+  only the tiles on screen, no prefetch or offline use, and the credit always visible on the map.
+  Details in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+- Contact: [GitHub issues](https://github.com/pirates-killer/homebridge-openlinko/issues).
 
 ## Development
 
@@ -150,7 +163,7 @@ npm pack          # homebridge-openlinko-x.y.z.tgz
 ## Credits
 
 - [Leaflet](https://leafletjs.com) (BSD-2-Clause, bundled in the settings page) and map data from
-  [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
+  [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL).
 - [OpenLinko](https://github.com/GodrezJr2/openlinko) by [GodrezJr2](https://github.com/GodrezJr2),
   which does all the heavy lifting: CarLinko login, telemetry decoding, and encrypted control frames.
 - The OpenLinko community, for model decodes and testing.

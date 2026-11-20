@@ -1,14 +1,19 @@
 // Backend of the plugin's settings page. Runs inside the Homebridge UI (admin login required),
-// never inside the bridge. Same rule as the plugin: it only ever talks to OpenLinko -- plus, when you
-// paste a short Google Maps share link, one request to Google to read where that link points.
+// never inside the bridge. It talks to two places only:
+//   - your OpenLinko server (Test connection, the car's location), like the plugin itself
+//   - the map tile server, for the tiles you are looking at, under the OSMF Tile Usage Policy
+//     (see src/tiles.ts)
 
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { HomebridgePluginUiServer, RequestError } from '@homebridge/plugin-ui-utils';
 import { OpenLinkoClient } from '../dist/client.js';
 import { baseUrl } from '../dist/config.js';
 import { isShortMapsLink, parseLatLng } from '../dist/geo.js';
+import { TILE_USER_AGENT } from '../dist/settings.js';
+import { OSM_TILE_URL, TileError, TileFetcher, validTileUrl } from '../dist/tiles.js';
 
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
-const SHORT_LINK_HOSTS = /(^|\.)(goo\.gl|google\.[a-z.]+)$/i;
 
 function client(conn) {
   return new OpenLinkoClient(baseUrl(conn ?? {}), conn?.password || undefined, quiet);
@@ -29,35 +34,34 @@ function reason(e) {
   return cause ? `${msg} (${cause})` : msg;
 }
 
-/** Follow a short share link (up to 4 redirects) and return the coordinates it points at. */
-async function resolveShortLink(link) {
-  let url = link;
-  for (let hop = 0; hop < 4; hop++) {
-    const host = new URL(url).hostname;
-    if (!SHORT_LINK_HOSTS.test(host)) {
-      break;
-    }
-    const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(8000) });
-    const next = res.headers.get('location');
-    if (next) {
-      await res.body?.cancel();
-      url = new URL(next, url).toString();
-      const hit = parseLatLng(url);
-      if (hit) {
-        return hit;
-      }
-      continue;
-    }
-    const body = (await res.text()).slice(0, 200_000);   // some pages redirect in HTML instead
-    return parseLatLng(url) ?? parseLatLng((/!3d-?[\d.]+!4d-?[\d.]+/.exec(body) ?? [''])[0])
-      ?? parseLatLng((/@-?[\d.]+,-?[\d.]+/.exec(body) ?? [''])[0]);
-  }
-  return parseLatLng(url);
-}
-
 class OpenLinkoUiServer extends HomebridgePluginUiServer {
   constructor() {
     super();
+    const cacheRoot = join(this.homebridgeStoragePath || tmpdir(), 'homebridge-openlinko', 'tiles');
+    const fetchers = new Map();
+    const fetcherFor = (url) => {
+      const u = validTileUrl(url || OSM_TILE_URL);
+      if (!u) {
+        throw new RequestError('the map tile URL must be https and contain {z}, {x} and {y}', { status: 400 });
+      }
+      if (!fetchers.has(u)) {
+        fetchers.set(u, new TileFetcher({ dir: cacheRoot, userAgent: TILE_USER_AGENT, url: u }));
+      }
+      return fetchers.get(u);
+    };
+
+    // One map tile the page is showing, as a data URL (the page's own requests can't reach OSM).
+    this.onRequest('/tile', async ({ z, x, y, url } = {}) => {
+      try {
+        const png = await fetcherFor(url).get(Number(z), Number(x), Number(y));
+        return { ok: true, data: png.toString('base64') };
+      } catch (e) {
+        if (e instanceof RequestError) {
+          throw e;
+        }
+        return { ok: false, error: e instanceof TileError || e instanceof RangeError ? e.message : reason(e) };
+      }
+    });
 
     // "Test connection": the same calls the plugin makes at startup.
     this.onRequest('/test', async (conn) => {
@@ -100,18 +104,19 @@ class OpenLinkoUiServer extends HomebridgePluginUiServer {
       }
     });
 
-    // Paste box: coordinates, Google/Apple Maps links, geo: URIs, DMS text.
+    // Paste box: coordinates, Google/Apple Maps links, geo: URIs, DMS text. Parsed locally only:
+    // nothing is fetched. Short share links hide the coordinates behind a redirect, so the user is
+    // asked to open the link and paste the full address instead of us requesting it.
     this.onRequest('/parse', async ({ text } = {}) => {
       const t = String(text ?? '').trim().slice(0, 4000);
-      try {
-        const hit = isShortMapsLink(t) ? await resolveShortLink(t) : parseLatLng(t);
-        if (hit) {
-          return { ok: true, ...hit };
-        }
-        return { ok: false, error: 'no coordinates found in that text' };
-      } catch (e) {
-        throw new RequestError(`could not read that link: ${reason(e)}`, { status: 400 });
+      const hit = parseLatLng(t);
+      if (hit) {
+        return { ok: true, ...hit };
       }
+      if (isShortMapsLink(t)) {
+        return { ok: false, error: 'short share links hide the coordinates. Open the link in your browser, then copy the full address from the address bar (or the coordinates) and paste that' };
+      }
+      return { ok: false, error: 'no coordinates found in that text' };
     });
 
     this.ready();

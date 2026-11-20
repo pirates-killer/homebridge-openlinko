@@ -43,7 +43,8 @@
   }
 
   function say(el, text, kind) {
-    el.textContent = text;
+    text = String(text);
+    el.textContent = text.charAt(0).toUpperCase() + text.slice(1);
     el.className = 'ol-result' + (kind ? ' ' + kind : '');
     hb.fixScrollHeight();
   }
@@ -224,6 +225,63 @@
     });
   }
 
+  // ---- map tiles ----
+  // Tiles come through the settings backend (see src/tiles.ts for why and for the OSM tile policy
+  // it follows). Attribution stays visible on the map, bottom-right, as the policy requires.
+
+  const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+    + ' | <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Report a map issue</a>';
+  let tileNoteShown = false;
+
+  function escapeHtml(t) {
+    return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function tileFailed(why) {
+    if (tileNoteShown) {
+      return;
+    }
+    tileNoteShown = true;
+    say($('ol-map-note'), `The map background couldn't load (${why}). Setting home still works: click the map, paste coordinates, or use the car's location.`, 'bad');
+  }
+
+  function tileLayer(cfg) {
+    const custom = typeof cfg.mapTileUrl === 'string' && cfg.mapTileUrl.trim() ? cfg.mapTileUrl.trim() : '';
+    const attribution = custom
+      ? escapeHtml(cfg.mapAttribution || `Map tiles: ${(() => { try { return new URL(custom.replace(/\{[zxy]\}/g, '0')).hostname; } catch { return 'custom server'; } })()}`)
+      : OSM_ATTRIBUTION;
+    const Layer = L.TileLayer.extend({
+      createTile(coords, done) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.setAttribute('role', 'presentation');
+        hb.request('/tile', { z: coords.z, x: coords.x, y: coords.y, url: custom || undefined }).then((r) => {
+          if (r && r.ok) {
+            img.onload = () => done(null, img);
+            img.onerror = () => done(new Error('bad tile'), img);
+            img.src = 'data:image/png;base64,' + r.data;
+          } else {
+            tileFailed((r && r.error) || 'no tile');
+            done(new Error((r && r.error) || 'no tile'), img);
+          }
+        }, (e) => {
+          tileFailed(e.message || String(e));
+          done(e, img);
+        });
+        return img;
+      },
+    });
+    // Only the tiles in view, once panning/zooming settles: no in-between zoom levels, no prefetch.
+    return new Layer(custom || OSM_URL, {
+      maxZoom: 19,
+      attribution,
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      keepBuffer: 1,
+    });
+  }
+
   // ---- start ----
 
   async function start() {
@@ -257,10 +315,7 @@
     $('ol-map').classList.toggle('ol-off', home.enabled !== true);
 
     map = L.map('ol-map', { worldCopyJump: true }).setView([20, 100], 3);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    tileLayer(cfg).addTo(map);
     map.on('click', (e) => setHome(e.latlng.lat, e.latlng.lng, false));
 
     if (typeof home.lat === 'number' && typeof home.lng === 'number') {
