@@ -3,8 +3,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import {
-  CarAccessory, ClimateAccessory, DoorsAccessory, FindAccessory, LiftgateAccessory, LockAccessory,
-  PresenceAccessory, SunroofAccessory, WindowsAccessory,
+  CarAccessory, ChargingAccessory, ClimateAccessory, DoorsAccessory, FindAccessory, LiftgateAccessory, LockAccessory,
+  PresenceAccessory, SunroofAccessory, WindowStatusAccessory, WindowsAccessory, sunroofTiltSwitch, windowsVentSwitch,
 } from './accessories.js';
 import { OpenLinkoClient } from './client.js';
 import { baseUrl } from './config.js';
@@ -23,14 +23,19 @@ export interface OpenLinkoConfig extends PlatformConfig {
   defaultTemp?: number;
   find?: boolean;
   windows?: boolean;
+  windowsVent?: boolean;
+  windowSensors?: boolean;
   sunroof?: boolean;
+  sunroofTilt?: boolean;
+  charging?: boolean;
   liftgate?: boolean;
   doors?: boolean;
   lowBattery?: number;
   home?: { enabled?: boolean; lat?: number; lng?: number; radius?: number };
 }
 
-type Kind = 'lock' | 'climate' | 'find' | 'windows' | 'sunroof' | 'liftgate' | 'doors' | 'home';
+type Kind = 'lock' | 'charging' | 'climate' | 'find' | 'windows' | 'windowsVent' | 'windowSensors'
+  | 'sunroof' | 'sunroofTilt' | 'liftgate' | 'doors' | 'home';
 
 interface Cache {
   key?: string;
@@ -175,6 +180,9 @@ export class OpenLinkoPlatform implements DynamicPlatformPlugin {
     if (on(c.lock, true) && caps.lock !== false) {
       want.set('lock', name);
     }
+    if (on(c.charging, true)) {
+      want.set('charging', `${name} Charging`);
+    }
     if (on(c.climate, true) && caps.ac?.switch) {
       want.set('climate', `${name} A/C`);
     }
@@ -183,9 +191,18 @@ export class OpenLinkoPlatform implements DynamicPlatformPlugin {
     }
     if (on(c.windows, true) && (caps.windows?.open || caps.windows?.close)) {
       want.set('windows', `${name} Windows`);
+      if (on(c.windowsVent, true) && caps.windows?.vent) {
+        want.set('windowsVent', `${name} Windows Vent`);
+      }
+    }
+    if (on(c.windowSensors, true) && (caps.windows?.open || caps.windows?.close)) {
+      want.set('windowSensors', `${name} Window Status`);
     }
     if (on(c.sunroof, false) && caps.sunroof?.open) {
       want.set('sunroof', `${name} Sunroof`);
+      if (on(c.sunroofTilt, true) && caps.sunroof?.tilt) {
+        want.set('sunroofTilt', `${name} Sunroof Tilt`);
+      }
     }
     if (on(c.liftgate, false) && (caps.liftgate || caps.trunk)) {
       want.set('liftgate', `${name} Liftgate`);
@@ -259,8 +276,12 @@ export class OpenLinkoPlatform implements DynamicPlatformPlugin {
       case 'lock': return new LockAccessory(this, acc, label);
       case 'climate': return new ClimateAccessory(this, acc, label, caps.ac);
       case 'find': return new FindAccessory(this, acc, label);
-      case 'windows': return new WindowsAccessory(this, acc, label, caps.windows);
-      case 'sunroof': return new SunroofAccessory(this, acc, label, caps.sunroof);
+      case 'charging': return new ChargingAccessory(this, acc, label);
+      case 'windows': return new WindowsAccessory(this, acc, label);
+      case 'windowsVent': return windowsVentSwitch(this, acc, label);
+      case 'windowSensors': return new WindowStatusAccessory(this, acc, label);
+      case 'sunroof': return new SunroofAccessory(this, acc, label);
+      case 'sunroofTilt': return sunroofTiltSwitch(this, acc, label);
       case 'liftgate': return new LiftgateAccessory(this, acc, label);
       case 'doors': return new DoorsAccessory(this, acc, label);
       case 'home': return new PresenceAccessory(this, acc, label, fence!);

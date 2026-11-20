@@ -112,64 +112,51 @@ export function snapTemp(c: number, caps: Caps['ac']): number {
 }
 
 // ---- windows ----
-// HomeKit windows are a 0-100 position; the car only knows close / vent / open.
-export const WINDOW_VENT_POS = 20;
+// The car opens, vents or closes ALL windows together: there is no per-window command anywhere in
+// CarLinko's command set. It does report each window: 2 bits each, MSB first (driver, passenger,
+// rear driver-side, rear passenger-side): closed / open / partial. On a Tiggo 7 CSH "windows open"
+// read 0x55 (all four "open"), a vent reads "partial".
 
-export type WindowCmd = 'close' | 'vent' | 'open';
+export const WINDOW_NAMES = ['Driver', 'Passenger', 'Rear driver-side', 'Rear passenger-side'] as const;
 
-export function windowCmdFor(pos: number, canVent: boolean): WindowCmd {
-  if (pos <= 10) {
-    return 'close';
-  }
-  if (canVent && pos <= 60) {
-    return 'vent';
-  }
-  return 'open';
+function windows(ws: Summary['window_state']): (string | number)[] | null {
+  return Array.isArray(ws) && ws.length === 4 ? ws : null;
 }
 
-export function windowPosFor(cmd: WindowCmd): number {
-  return cmd === 'close' ? 0 : cmd === 'vent' ? WINDOW_VENT_POS : 100;
+/** Any window not closed (open or vented). null = unknown. */
+export function anyWindowOpen(ws: Summary['window_state']): boolean | null {
+  const w = windows(ws);
+  return w ? w.some((x) => x !== 'closed') : null;
 }
 
-/** Current window position from window_state: all closed -> 0, any open -> 100, else vent. */
-export function windowsPosition(ws: Summary['window_state']): number | null {
-  if (!Array.isArray(ws) || ws.length === 0) {
-    return null;
-  }
-  if (ws.some((w) => w === 'open')) {
-    return 100;
-  }
-  if (ws.every((w) => w === 'closed')) {
-    return 0;
-  }
-  return WINDOW_VENT_POS;
+/** Windows vented: some partly open and none fully open. null = unknown. */
+export function windowsVented(ws: Summary['window_state']): boolean | null {
+  const w = windows(ws);
+  return w ? w.some((x) => x === 'partial') && !w.some((x) => x === 'open') : null;
 }
 
-export type RoofCmd = 'close' | 'tilt' | 'open';
+/** One window (0-3, see WINDOW_NAMES) not closed. null = unknown. */
+export function windowOpen(ws: Summary['window_state'], i: number): boolean | null {
+  const w = windows(ws);
+  return w && w[i] !== undefined ? w[i] !== 'closed' : null;
+}
 
-export function roofCmdFor(pos: number, canTilt: boolean): RoofCmd {
-  if (pos <= 10) {
-    return 'close';
+// ---- sunroof ----
+// OpenLinko decodes byte 9 with the Omoda E5's values (0x00 closed, 0x08 open, 0x0B tilt) and passes
+// anything else through as a number. A Tiggo 7 CSH reads 0x07 while open, so any other non-zero
+// value is taken as open (its tilt value isn't known yet).
+
+export type RoofState = 'closed' | 'open' | 'tilt';
+
+export function sunroofState(s: Summary['sunroof']): RoofState | null {
+  if (s === 'closed' || s === 0) {
+    return 'closed';
   }
-  if (canTilt && pos <= 60) {
+  if (s === 'tilt' || s === 0x0b) {
     return 'tilt';
   }
-  return 'open';
-}
-
-export function roofPosFor(cmd: RoofCmd): number {
-  return cmd === 'close' ? 0 : cmd === 'tilt' ? WINDOW_VENT_POS : 100;
-}
-
-export function sunroofPosition(s: Summary['sunroof']): number | null {
-  if (s === 'closed') {
-    return 0;
-  }
-  if (s === 'tilt') {
-    return WINDOW_VENT_POS;
-  }
-  if (s === 'open') {
-    return 100;
+  if (s === 'open' || (typeof s === 'number' && s > 0)) {
+    return 'open';
   }
   return null;
 }

@@ -1,8 +1,8 @@
 import type { CharacteristicValue, PlatformAccessory, Service, WithUUID } from 'homebridge';
 import type { OpenLinkoPlatform } from './platform.js';
 import {
-  OP, Pending, anyDoorOpen, atHome, controlError, decodeSetPoint, roofCmdFor, roofPosFor, snapTemp,
-  sunroofPosition, tempOp, windowCmdFor, windowPosFor, windowsPosition,
+  OP, Pending, WINDOW_NAMES, anyDoorOpen, anyWindowOpen, atHome, controlError, decodeSetPoint, snapTemp,
+  sunroofState, tempOp, windowOpen, windowsVented,
   type Caps, type ControlResult, type Location, type Summary,
 } from './state.js';
 
@@ -290,91 +290,186 @@ export class FindAccessory extends CarAccessory {
 
 // ---------------------------------------------------------------------------------------------
 
-type PosCmd = { op: string; pos: number; what: string };
-
-/** A HomeKit window (0-100) driving the car's three-state windows or sunroof. */
-abstract class PositionAccessory extends CarAccessory {
+/**
+ * Open/close tile (a HomeKit window, 0 or 100 only) for something the car moves as a whole: all
+ * windows, or the sunroof. A tap opens or closes it; there's no slider to guess positions with.
+ */
+abstract class OpenCloseAccessory extends CarAccessory {
   protected readonly svc: Service;
   private readonly target = new Pending<number>(HOLD_MS);
 
-  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string) {
+  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string,
+    private readonly cmd: { open: string; close: string; thing: string; slot: string }) {
     super(platform, accessory, label);
     const { C } = this;
     this.svc = this.service(this.S.Window, label);
-    this.svc.getCharacteristic(C.CurrentPosition).onGet(() => this.actual(this.s) ?? 0);
+    this.svc.getCharacteristic(C.CurrentPosition).setProps({ minStep: 100 }).onGet(() => this.current(this.s));
     this.svc.getCharacteristic(C.TargetPosition)
+      .setProps({ minStep: 100 })
       .onGet(() => this.targetPos(this.s))
-      .onSet((v) => this.setTarget(Number(v)));
+      .onSet((v) => this.setTarget(Number(v) >= 50 ? 100 : 0));
     this.svc.getCharacteristic(C.PositionState).onGet(() => this.posState(this.s));
   }
 
-  protected abstract actual(s: Summary): number | null;
-  protected abstract command(pos: number): PosCmd;
+  /** true = open (anything but fully closed), false = closed, null = unknown. */
+  protected abstract isOpen(s: Summary): boolean | null;
+
+  private current(s: Summary): number {
+    const o = this.isOpen(s);
+    return o === null ? 0 : o ? 100 : 0;
+  }
 
   private targetPos(s: Summary): number {
-    return this.target.target(this.actual(s)) ?? this.actual(s) ?? 0;
+    const o = this.isOpen(s);
+    return this.target.target(o === null ? null : o ? 100 : 0) ?? this.current(s);
   }
 
   private posState(s: Summary): number {
     const { C } = this;
-    const cur = this.actual(s) ?? 0;
+    const cur = this.current(s);
     const tgt = this.targetPos(s);
     return tgt > cur ? C.PositionState.INCREASING : tgt < cur ? C.PositionState.DECREASING : C.PositionState.STOPPED;
   }
 
-  private setTarget(v: number): void {
-    const cmd = this.command(v);
-    this.target.set(cmd.pos);
-    // snap the slider to what the car can actually do
-    setTimeout(() => this.svc.updateCharacteristic(this.C.TargetPosition, cmd.pos), 100);
-    this.send(cmd.op, cmd.what, (ok) => {
+  private setTarget(pos: number): void {
+    const open = pos === 100;
+    this.target.set(pos);
+    this.send(open ? this.cmd.open : this.cmd.close, `${open ? 'open' : 'close'} the ${this.cmd.thing}`, (ok) => {
       if (!ok) {
         this.target.clear();
       }
       this.update(this.platform.summary);
-    });
+    }, this.cmd.slot);
   }
 
   update(s: Summary): void {
     const { C } = this;
-    const cur = this.actual(s);
-    if (cur !== null) {
-      this.svc.updateCharacteristic(C.CurrentPosition, cur);
-    }
+    this.svc.updateCharacteristic(C.CurrentPosition, this.current(s));
     this.svc.updateCharacteristic(C.TargetPosition, this.targetPos(s));
     this.svc.updateCharacteristic(C.PositionState, this.posState(s));
   }
 }
 
-export class WindowsAccessory extends PositionAccessory {
-  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string, private readonly caps: Caps['windows']) {
-    super(platform, accessory, label);
+/** All windows together: the car has no per-window command. */
+export class WindowsAccessory extends OpenCloseAccessory {
+  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string) {
+    super(platform, accessory, label, { open: OP.windowsOpen, close: OP.windowsClose, thing: 'windows', slot: 'windows' });
   }
 
-  protected actual(s: Summary): number | null {
-    return windowsPosition(s.window_state);
-  }
-
-  protected command(pos: number): PosCmd {
-    const cmd = windowCmdFor(pos, this.caps?.vent !== false);
-    const op = cmd === 'close' ? OP.windowsClose : cmd === 'vent' ? OP.windowsVent : OP.windowsOpen;
-    return { op, pos: windowPosFor(cmd), what: `windows ${cmd}` };
+  protected isOpen(s: Summary): boolean | null {
+    return anyWindowOpen(s.window_state);
   }
 }
 
-export class SunroofAccessory extends PositionAccessory {
-  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string, private readonly caps: Caps['sunroof']) {
+export class SunroofAccessory extends OpenCloseAccessory {
+  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string) {
+    super(platform, accessory, label, { open: OP.sunroofOpen, close: OP.sunroofClose, thing: 'sunroof', slot: 'sunroof' });
+  }
+
+  protected isOpen(s: Summary): boolean | null {
+    const r = sunroofState(s.sunroof);
+    return r === null ? null : r !== 'closed';
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A switch for a car mode that's undone by closing: Windows Vent (on = vent all, off = close all)
+ * and Sunroof Tilt (on = tilt, off = close). It shares its slot with the matching open/close tile,
+ * so the newest of the two wins if both are tapped quickly.
+ */
+export class ModeSwitchAccessory extends CarAccessory {
+  private readonly svc: Service;
+  private readonly target = new Pending<boolean>(HOLD_MS);
+
+  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string,
+    private readonly m: { on: string; off: string; onWhat: string; offWhat: string; slot: string; isOn: (s: Summary) => boolean | null }) {
     super(platform, accessory, label);
+    this.svc = this.service(this.S.Switch, label);
+    this.svc.getCharacteristic(this.C.On)
+      .onGet(() => this.state(this.s))
+      .onSet((v) => this.set(!!v));
   }
 
-  protected actual(s: Summary): number | null {
-    return sunroofPosition(s.sunroof);
+  private state(s: Summary): boolean {
+    return this.target.target(this.m.isOn(s)) ?? false;
   }
 
-  protected command(pos: number): PosCmd {
-    const cmd = roofCmdFor(pos, !!this.caps?.tilt);
-    const op = cmd === 'close' ? OP.sunroofClose : cmd === 'tilt' ? OP.sunroofTilt : OP.sunroofOpen;
-    return { op, pos: roofPosFor(cmd), what: `sunroof ${cmd}` };
+  private set(on: boolean): void {
+    this.target.set(on);
+    this.send(on ? this.m.on : this.m.off, on ? this.m.onWhat : this.m.offWhat, (ok) => {
+      if (!ok) {
+        this.target.clear();
+      }
+      this.update(this.platform.summary);
+    }, this.m.slot);
+  }
+
+  update(s: Summary): void {
+    this.svc.updateCharacteristic(this.C.On, this.state(s));
+  }
+}
+
+export function windowsVentSwitch(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string): ModeSwitchAccessory {
+  return new ModeSwitchAccessory(platform, accessory, label, {
+    on: OP.windowsVent, off: OP.windowsClose, onWhat: 'vent the windows', offWhat: 'close the windows',
+    slot: 'windows', isOn: (s) => windowsVented(s.window_state),
+  });
+}
+
+export function sunroofTiltSwitch(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string): ModeSwitchAccessory {
+  return new ModeSwitchAccessory(platform, accessory, label, {
+    on: OP.sunroofTilt, off: OP.sunroofClose, onWhat: 'tilt the sunroof', offWhat: 'close the sunroof',
+    slot: 'sunroof', isOn: (s) => {
+      const r = sunroofState(s.sunroof);
+      return r === null ? null : r === 'tilt';
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+
+/** Each window's state as a contact sensor (read-only): "open" when it isn't fully closed. */
+export class WindowStatusAccessory extends CarAccessory {
+  private readonly sensors: Service[];
+
+  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string) {
+    super(platform, accessory, label);
+    this.sensors = WINDOW_NAMES.map((name, i) => {
+      const svc = this.service(this.S.ContactSensor, `${name} Window`, `window-${i}`);
+      svc.getCharacteristic(this.C.ContactSensorState).onGet(() => this.state(this.s, i));
+      return svc;
+    });
+  }
+
+  private state(s: Summary, i: number): number {
+    const { C } = this;
+    return windowOpen(s.window_state, i) ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED;
+  }
+
+  update(s: Summary): void {
+    this.sensors.forEach((svc, i) => svc.updateCharacteristic(this.C.ContactSensorState, this.state(s, i)));
+  }
+}
+
+/** "Charging" as an occupancy sensor: detected while the car charges. For automations. */
+export class ChargingAccessory extends CarAccessory {
+  private readonly svc: Service;
+
+  constructor(platform: OpenLinkoPlatform, accessory: PlatformAccessory, label: string) {
+    super(platform, accessory, label);
+    this.svc = this.service(this.S.OccupancySensor, label);
+    this.svc.getCharacteristic(this.C.OccupancyDetected).onGet(() => this.state(this.s));
+  }
+
+  private state(s: Summary): number {
+    const { C } = this;
+    return s.charging?.active ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED;
+  }
+
+  update(s: Summary): void {
+    this.svc.updateCharacteristic(this.C.OccupancyDetected, this.state(s));
   }
 }
 

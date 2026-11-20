@@ -62,6 +62,11 @@
         "minimum": 0,
         "maximum": 100
       },
+      "charging": {
+        "title": "Charging sensor (detected while charging; for automations)",
+        "type": "boolean",
+        "default": true
+      },
       "climate": {
         "title": "A/C (on/off and temperature)",
         "type": "boolean",
@@ -80,14 +85,32 @@
         "default": true
       },
       "windows": {
-        "title": "Windows (close / vent / open)",
+        "title": "Windows: open / close (all together; the car has no per-window command)",
+        "type": "boolean",
+        "default": true
+      },
+      "windowsVent": {
+        "title": "Windows Vent switch (on = vent all, off = close all)",
+        "type": "boolean",
+        "default": true
+      },
+      "windowSensors": {
+        "title": "Window status sensors (which window is open; read-only)",
         "type": "boolean",
         "default": true
       },
       "sunroof": {
-        "title": "Sunroof (close / tilt / open)",
+        "title": "Sunroof: open / close",
         "type": "boolean",
         "default": false
+      },
+      "sunroofTilt": {
+        "title": "Sunroof Tilt switch (on = tilt, off = close)",
+        "type": "boolean",
+        "default": true,
+        "condition": {
+          "functionBody": "return model.sunroof === true;"
+        }
       },
       "liftgate": {
         "title": "Power liftgate / boot",
@@ -160,11 +183,15 @@
         "carName",
         "lock",
         "lowBattery",
+        "charging",
         "climate",
         "defaultTemp",
         "find",
         "windows",
+        "windowsVent",
+        "windowSensors",
         "sunroof",
+        "sunroofTilt",
         "liftgate",
         "doors"
       ]

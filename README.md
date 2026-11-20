@@ -20,11 +20,15 @@ server's local API. It never logs in to CarLinko itself, so:
 | Home tile | What it does | Comes from |
 |---|---|---|
 | **Lock** | Lock / unlock. Home asks for Face ID before unlocking | lock state in the car's status |
-| **Battery** (on the lock) | Level, charging, low-battery alert | battery %, charging state |
+| **Battery** (on the lock) | Level, charging, low-battery alert; Siri: "what's the Tiggo battery level?" | battery %, charging state |
+| **Charging** | Sensor, detected while charging. For automations ("charging stopped → notify me") | charging state |
 | **A/C** | On / off, set temperature (car's own range and step, e.g. 15.5–30.5 °C in 0.5) | A/C flag and set-point |
 | **Find car** | Horn and lights, then the switch turns itself off | none (no state) |
-| **Windows** | Close / vent / open (slider snaps: 0 = close, ~20 = vent, 100 = open) | per-window state |
-| **Sunroof** *(off by default)* | Close / tilt / open | sunroof state |
+| **Windows** | Open / close **all windows** with a tap. The car has no per-window command | per-window state |
+| **Windows Vent** | Switch: on = vent all windows, off = close them | per-window state |
+| **Window Status** | Four read-only sensors (driver, passenger, rear driver-side, rear passenger-side): which window is open | per-window state |
+| **Sunroof** *(off by default)* | Open / close with a tap | sunroof state |
+| **Sunroof Tilt** *(with Sunroof)* | Switch: on = tilt, off = close | sunroof state |
 | **Liftgate** *(off by default)* | Open / close the power boot (a garage door tile, so Home asks for Face ID before opening it) | boot state |
 | **Doors** | Contact sensor: any door or the boot open | door bitmask |
 | **Car at home** *(optional)* | Occupancy sensor inside a geofence around your home | OpenLinko's car location |
@@ -106,8 +110,8 @@ The equivalent `config.json`:
 | `https` | `false` | Only for an OpenLinko behind an HTTPS proxy |
 | `password` | none | Only if OpenLinko has a dashboard password |
 | `carName` | `Car` | Prefix for tile names, which is also what you say to Siri |
-| `lock`, `climate`, `find`, `windows`, `doors` | `true` | Turn off tiles you don't want |
-| `sunroof`, `liftgate` | `false` | Opt in |
+| `lock`, `charging`, `climate`, `find`, `windows`, `windowsVent`, `windowSensors`, `doors` | `true` | Turn off tiles you don't want |
+| `sunroof`, `liftgate` | `false` | Opt in (`sunroofTilt` follows `sunroof`) |
 | `defaultTemp` | `22` | A/C temperature shown until the car reports its own |
 | `lowBattery` | `20` | Low-battery alert threshold (%) |
 | `home` | off | `lat`, `lng`, `radius` (m, min 50). Leaving needs 1.5 × radius, so the sensor doesn't flap at the edge |
@@ -134,6 +138,9 @@ network to Wi-Fi clients on a satellite. You only need this while pairing.
   operation permission"*).
 - A **sleeping car** may accept a command without confirming it. The tile keeps the new state for up to 2 minutes
   while the car wakes up and reports, then follows the car.
+- **Windows and sunroof** are tap-to-open/close tiles, plus Vent and Tilt switches, because the car
+  only knows those moves. There's no position to drag to. Locking the car also closes its windows
+  (the car does this itself).
 - **A/C:** the car reports no cabin temperature, so "current temperature" shows the set-point.
   Dragging the slider sends one command, where you let go.
 - If OpenLinko can't be reached for 5 minutes, the tiles show **No Response** rather than stale values.

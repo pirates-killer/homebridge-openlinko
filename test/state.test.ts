@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  OP, Pending, anyDoorOpen, atHome, decodeSetPoint, haversineM, isAllowedOp, roofCmdFor, snapTemp,
-  sunroofPosition, tempOp, windowCmdFor, windowsPosition,
+  OP, Pending, anyDoorOpen, anyWindowOpen, atHome, decodeSetPoint, haversineM, isAllowedOp, snapTemp,
+  sunroofState, tempOp, windowOpen, windowsVented,
 } from '../src/state.js';
 
 test('temperature command matches OpenLinko/app encoding (0x80 + 2 x degC)', () => {
@@ -42,19 +42,34 @@ test('allow-list: no engine start, no arbitrary opcodes', () => {
   assert.equal(isAllowedOp('7411'), false);
 });
 
-test('window position <-> command', () => {
-  assert.equal(windowCmdFor(0, true), 'close');
-  assert.equal(windowCmdFor(30, true), 'vent');
-  assert.equal(windowCmdFor(30, false), 'open');
-  assert.equal(windowCmdFor(100, true), 'open');
-  assert.equal(windowsPosition(['closed', 'closed', 'closed', 'closed']), 0);
-  assert.equal(windowsPosition(['closed', 'partial', 'closed', 'closed']), 20);
-  assert.equal(windowsPosition(['open', 'partial', 'closed', 'closed']), 100);
-  assert.equal(windowsPosition(null), null);
-  assert.equal(roofCmdFor(40, true), 'tilt');
-  assert.equal(roofCmdFor(40, false), 'open');
-  assert.equal(sunroofPosition('tilt'), 20);
-  assert.equal(sunroofPosition(11), null);
+test('windows: all-together state, vent, and each window (Tiggo 7 CSH frames)', () => {
+  const closed = ['closed', 'closed', 'closed', 'closed'];
+  const allOpen = ['open', 'open', 'open', 'open'];            // byte 8 = 0x55, seen 12:25:50
+  const vented = ['partial', 'partial', 'partial', 'partial'];
+  assert.equal(anyWindowOpen(closed), false);
+  assert.equal(anyWindowOpen(allOpen), true);
+  assert.equal(anyWindowOpen(vented), true);
+  assert.equal(anyWindowOpen(null), null);
+  assert.equal(anyWindowOpen(['closed']), null);              // not a 4-window reading
+  assert.equal(windowsVented(vented), true);
+  assert.equal(windowsVented(allOpen), false);
+  assert.equal(windowsVented(['partial', 'open', 'closed', 'closed']), false);
+  assert.equal(windowsVented(closed), false);
+  assert.equal(windowOpen(['closed', 'open', 'closed', 'partial'], 1), true);
+  assert.equal(windowOpen(['closed', 'open', 'closed', 'partial'], 3), true);
+  assert.equal(windowOpen(['closed', 'open', 'closed', 'partial'], 0), false);
+  assert.equal(windowOpen(null, 0), null);
+});
+
+test('sunroof: E5 labels and the Tiggo 7 raw 0x07', () => {
+  assert.equal(sunroofState('closed'), 'closed');
+  assert.equal(sunroofState(0), 'closed');
+  assert.equal(sunroofState('open'), 'open');
+  assert.equal(sunroofState(7), 'open');                    // Tiggo 7 CSH, seen 12:24:39
+  assert.equal(sunroofState('tilt'), 'tilt');
+  assert.equal(sunroofState(0x0b), 'tilt');
+  assert.equal(sunroofState(null), null);
+  assert.equal(sunroofState(undefined), null);
 });
 
 test('doors bitmask', () => {
