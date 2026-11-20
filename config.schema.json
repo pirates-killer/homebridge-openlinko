@@ -171,6 +171,12 @@
         "title": "Map credit for that server",
         "type": "string",
         "description": "Shown on the map, as most tile servers require. Not needed for OpenStreetMap (its credit is built in)."
+      },
+      "logStates": {
+        "title": "Log what Home shows",
+        "type": "boolean",
+        "default": false,
+        "description": "Writes a log line each time a tile's state changes in Home (lock, doors, windows, A/C, charging...), with its time. Useful to compare with the notifications on your phone. Off by default: a drive can add dozens of lines."
       }
     }
   },
@@ -205,6 +211,15 @@
       "items": [
         "mapTileUrl",
         "mapAttribution"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Troubleshooting",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "logStates"
       ]
     }
   ]

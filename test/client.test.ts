@@ -162,3 +162,21 @@ test('per-tile slots: duplicates are not re-sent; a queued command is replaced b
     f.close();
   }
 });
+
+test('isQueued: true only for the same command in the same slot, until it has finished', async () => {
+  const f = await fakeOpenLinko();
+  try {
+    const c = new OpenLinkoClient(f.url, undefined, quiet);
+    assert.equal(c.isQueued('740500', 'windows'), false);
+    const p = c.control('740500', 'windows');
+    assert.equal(c.isQueued('740500', 'windows'), true);       // a second Home request would share it
+    assert.equal(c.isQueued('740600', 'windows'), false);      // another command for the tile
+    assert.equal(c.isQueued('740500', 'sunroof'), false);      // another tile
+    assert.equal(c.isQueued('740500'), false);                 // no slot, no sharing
+    await p;
+    await new Promise((r) => setImmediate(r));                  // the slot is released after the result
+    assert.equal(c.isQueued('740500', 'windows'), false);
+  } finally {
+    f.close();
+  }
+});
