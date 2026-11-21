@@ -1,7 +1,12 @@
 name: publish
 
-# Publishes to npm when a GitHub release is published (tag vX.Y.Z = package.json version).
-# Needs an npm automation token in the repo secret NPM_TOKEN.
+# Runs when a GitHub release is published (tag vX.Y.Z = package.json version).
+# Put the version's CHANGELOG.md section in the release notes: the Homebridge UI
+# shows them in its update dialog.
+#
+# npm Trusted Publishing, no token: configure once on npmjs.com -> package ->
+# Settings -> Trusted Publisher -> GitHub Actions (this repository, workflow
+# publish.yml). Provenance is added automatically.
 on:
   release:
     types: [published]
@@ -16,11 +21,20 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-      - run: npm ci
+          node-version: 24
+      - name: npm with Trusted Publishing support (11.5.1+)
+        run: npm install -g npm@^11.5.1
       - name: Tag matches package.json
         run: test "v$(node -p 'require("./package.json").version')" = "${GITHUB_REF_NAME}"
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Skip if this version is already on npm
+        id: check
+        run: |
+          spec="$(node -p 'const p = require("./package.json"); p.name + "@" + p.version')"
+          if npm view "$spec" version >/dev/null 2>&1; then
+            echo "::notice::$spec is already on npm, nothing to publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.skip != 'true'
+        run: npm ci
+      - if: steps.check.outputs.skip != 'true'
+        run: npm publish --access public
